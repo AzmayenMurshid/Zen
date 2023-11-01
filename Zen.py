@@ -8,11 +8,16 @@ from Keys import OPENWEATHER  # Keys.py is where I store all my API keys ZEN wil
 import operator  # used for math operations
 import random  # will be used throughout for random response choices
 import os  # used to interact with the computer's directory
-from VolumeControl import VolumeControl
 import pyjokes  # used to tell jokes
 import threading # used to run threads
 import time
 import pyautogui # Auto mouse movement
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+import random
+
+from volumes import volume_settings
 
 
 # Speech Recognition Constants
@@ -43,6 +48,11 @@ except Exception as e:
     LED = False
     pass
 
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+volume = cast(interface, POINTER(IAudioEndpointVolume))
+
+volMin, volMax = volume.GetVolumeRange()[:2]
 
 class Zen:
     def __init__(self):
@@ -262,6 +272,15 @@ class Zen:
         s.speak("Here is what I found.")
         webbrowser.open("https://www.google.com/search?q={}".format(command))
 
+    def sound_control(self, command):
+        global volume
+        if command.startswith('set volume to'):
+            vol = int(command[13:])
+            if vol in volume_settings:
+                volume.SetMasterVolumeLevel(vol, None)
+            else:
+                s.speak("That isn't an option")
+
     # Analyzes the command
     def analyze(self, command):
         try:
@@ -333,15 +352,6 @@ class Zen:
                 s.speak("Autopilot deactivated")
                 autopilot = False
                 return autopilot
-            
-            #TODO: Fix volume control
-            # elif command == "activate volume control":
-            #     s.speak("Volume control activated.")
-            #     VolumeControl()
-
-            # elif command == "deactivate volume control":
-            #     s.speak("Volume control deactivated.")
-            #     VolumeControl().Quit()
 
             elif command == "how are you":
                 current_feelings = ["I'm okay.", "I'm doing well. Thank you.", "I am doing okay."]
@@ -384,6 +394,8 @@ class Zen:
                     response = recognizer.recognize_google(audio)
 
                     if response == WAKE:
+                        responses = ["Yes?", "What can I help you with?"]
+                        s.speak(random.choice(responses))
                         if LED:
                             listening_byte = "L"  # L matches the Arduino sketch code for the blue color
                             ser.write(listening_byte.encode("ascii"))  # encodes and sends the serial byte
